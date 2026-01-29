@@ -115,16 +115,22 @@ SAT - Solution: {1: True, 2: False, 3: False}
 
 ## Running Tests
 
-Run the comprehensive test suite:
-
-```bash
-python -m pytest test_sat_solver.py -v
-```
-
-Or using unittest:
+Run the comprehensive test suite using unittest (no additional dependencies required):
 
 ```bash
 python test_sat_solver.py
+```
+
+For verbose output:
+
+```bash
+python test_sat_solver.py -v
+```
+
+Alternatively, if you have pytest installed:
+
+```bash
+python -m pytest test_sat_solver.py -v
 ```
 
 ## How It Works

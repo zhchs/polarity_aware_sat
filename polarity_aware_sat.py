@@ -36,7 +36,19 @@ class CNFFormula:
         return len(variables)
     
     def is_satisfied(self, assignment: Dict[int, bool]) -> bool:
-        """Check if the formula is satisfied by the given assignment."""
+        """
+        Check if the formula is satisfied by the given assignment.
+        
+        Note: This method expects a complete assignment. Partial assignments
+        (where some variables are unassigned) will be considered unsatisfying
+        if they leave any clause without a satisfying literal.
+        
+        Args:
+            assignment: Dictionary mapping variables to boolean values
+        
+        Returns:
+            True if formula is satisfied, False otherwise
+        """
         for clause in self.original_clauses:
             clause_satisfied = False
             for lit in clause:
@@ -278,8 +290,9 @@ class PolarityAwareSATSolver:
                     var_freq[var] += 1
         
         if not var_freq:
-            # All variables assigned
-            return 1
+            # This should not happen if DPLL logic is correct
+            # All clauses should be satisfied before all variables are assigned
+            raise RuntimeError("No unassigned variables found but clauses remain")
         
         # Choose most frequent variable
         return max(var_freq.keys(), key=lambda v: var_freq[v])
@@ -307,10 +320,13 @@ def parse_dimacs(text: str) -> CNFFormula:
     
     Returns:
         CNFFormula object
+    
+    Raises:
+        ValueError: If the input contains invalid integer literals
     """
     clauses = []
     
-    for line in text.strip().split('\n'):
+    for line_num, line in enumerate(text.strip().split('\n'), 1):
         line = line.strip()
         
         # Skip comments and problem line
@@ -320,8 +336,12 @@ def parse_dimacs(text: str) -> CNFFormula:
         if not line:
             continue
         
-        # Parse clause
-        literals = [int(x) for x in line.split()]
+        try:
+            # Parse clause
+            literals = [int(x) for x in line.split()]
+        except ValueError as e:
+            raise ValueError(f"Invalid DIMACS format on line {line_num}: {line}. "
+                           f"Expected integers but got: {e}")
         
         # Remove trailing 0
         if literals and literals[-1] == 0:
