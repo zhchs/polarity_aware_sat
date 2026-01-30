@@ -37,7 +37,7 @@ Navigate to the `python_torch_release` directory and use `train_core.py` to star
 
 ### Train PASAT (Proposed Model)
 
-To train the PASAT model on the SR Easy dataset (replacing <data-dir> with your local data directory):
+To train the PASAT model on the SR Easy dataset (replacing `<data-dir>` with your local data directory):
 
 ```bash
 python train_core.py --data_type SATBench --num_workers 8 --in_memory \
