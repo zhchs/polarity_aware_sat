@@ -75,35 +75,23 @@ def kl_loss(logits, pi_targets, batch, batch_size):
 
 
 def kl_loss_top_k(logits, pi_targets, batch, batch_size, top_k_ratio=0.5):
-    """
-    【新增】Top-K Hard Example Mining for KL Divergence.
-    解决简单样本（Core易识别）掩盖困难样本的问题。
-    """
-    # 1. 归一化 Target (保持原有逻辑)
     mask_sum_targets = scatter_sum(
         pi_targets, batch, dim=0, dim_size=batch_size)
     norm_mask_sum = mask_sum_targets[batch].clamp(min=1e-8)
     pi_targets_norm = pi_targets / norm_mask_sum
 
-    # 2. 计算预测分布
     prob_per_graph = softmax(logits, batch)
     log_prob_per_graph = torch.log(prob_per_graph + 1e-10)
 
-    # 3. 计算节点级 KL 散度
     kl_div_vec = pi_targets_norm * \
         (torch.log(pi_targets_norm + 1e-10) - log_prob_per_graph)
 
-    # 4. 聚合到图级别 (Shape: [Batch_Size])
     kl_graph_sum = scatter_sum(kl_div_vec, batch, dim=0, dim_size=batch_size)
 
-    # 5. Top-K 筛选: 只取 Loss 最大的前 K% 个图
-    # 至少取 1 个，防止 batch_size 极小时出错
     k = max(1, int(batch_size * top_k_ratio))
 
-    # 找出最大的 k 个值
     top_k_losses, _ = torch.topk(kl_graph_sum, k)
 
-    # 6. 只对这些难样本求平均
     return top_k_losses.mean()
 
 
@@ -640,8 +628,6 @@ def main(opts, cfg):
                 ''' 1. Prediction Loss '''
                 pi_v_targets = data.core_var_mask.float()
 
-                # 【修改】使用 kl_loss_top_k 替代原本的 kl_loss
-                # top_k_ratio=0.5: 只对 batch 中最难的 50% 样本计算 Loss
                 cv_loss = kl_loss_top_k(
                     logits, pi_v_targets, v_batch, batch_size, top_k_ratio=opts.top_k_ratio)
                 # cv_loss = kl_loss(logits, pi_v_targets, v_batch, batch_size)
@@ -650,11 +636,8 @@ def main(opts, cfg):
 
                 if opts.dual:
                     pi_v_targets_dual = data_dual.core_var_mask.float()
-                    # 【修改】Dual 部分也同步使用 kl_loss_top_k
                     cv_loss_dual = kl_loss_top_k(
                         logits_dual, pi_v_targets_dual, v_batch, batch_size, top_k_ratio=opts.top_k_ratio)
-                    # cv_loss_dual = kl_loss(
-                    #     logits_dual, pi_v_targets_dual, v_batch, batch_size)
 
                     cv_loss_dual = cv_loss_dual
                     cv_loss = cv_loss + cv_loss_dual
@@ -913,10 +896,6 @@ def main(opts, cfg):
                 ''' optimize and output '''
 
                 _lr = optimizer.param_groups[0]['lr']
-                # print(f"Epoch {epoch}, Batch: {idx}, Step: {global_step}, LR: {_lr:.12f}, "
-                #       f"Loss: {loss.cpu().item():.9f}, time: {n_secs:.4f}s")
-
-                # accum loss for optimizer
                 accum_step += 1
                 accum_batch += batch_size
                 accum_loss += _sum_loss
@@ -944,15 +923,6 @@ def main(opts, cfg):
                             mean_i = \
                                 accum_loss_list[i] / accum_count_list[i]
                             loss_mean_value += mean_i
-
-                    # if cfg['clip_val_val'] > 0:
-                    #     clip_val = float(cfg['clip_val_val'])
-                    #     for param in model.parameters():
-                    #         if param.grad is not None:
-                    #             param.grad.data.clamp_(-clip_val, clip_val)
-                    # if cfg['clip_norm_val'] > 0:
-                    #     torch.nn.utils.clip_grad_norm_(
-                    #         model.parameters(), max_norm=float(cfg['clip_norm_val']))
 
                     step_optimizer()
 
